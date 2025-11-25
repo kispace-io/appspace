@@ -43,6 +43,7 @@ export default defineConfig({
         'api/index': path.resolve(__dirname, 'src/api/index.ts'),
         'extensions/ai-system/index': path.resolve(__dirname, 'src/extensions/ai-system/index.ts'),
         'extensions/rag-system/index': path.resolve(__dirname, 'src/extensions/rag-system/index.ts'),
+        'extensions/github-service/github-service': path.resolve(__dirname, 'src/extensions/github-service/github-service.ts'),
         'widgets/index': path.resolve(__dirname, 'src/widgets/index.ts'),
         'parts/index': path.resolve(__dirname, 'src/parts/index.ts'),
         'externals/webawesome': path.resolve(__dirname, 'src/externals/webawesome.ts'),

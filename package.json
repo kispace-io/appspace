@@ -47,6 +47,10 @@
       "types": "./dist/extensions/in-browser-ml/*.d.ts",
       "import": "./dist/extensions/in-browser-ml/*.js"
     },
+    "./extensions/github-service/github-service": {
+      "types": "./dist/extensions/github-service/github-service.d.ts",
+      "import": "./dist/extensions/github-service/github-service.js"
+    },
     "./widgets": {
       "types": "./dist/widgets/index.d.ts",
       "import": "./dist/widgets/index.js"
