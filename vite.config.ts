@@ -46,7 +46,7 @@ export default defineConfig({
         'widgets/index': path.resolve(__dirname, 'src/widgets/index.ts'),
         'parts/index': path.resolve(__dirname, 'src/parts/index.ts'),
         'externals/webawesome': path.resolve(__dirname, 'src/externals/webawesome.ts'),
-        'externals/lit': path.resolve(__dirname, 'src/externals/lit-exports.ts'),
+        'externals/lit': path.resolve(__dirname, 'src/externals/lit.ts'),
         'externals/third-party': path.resolve(__dirname, 'src/externals/third-party.ts'),
       },
       formats: ['es'],
