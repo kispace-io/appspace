@@ -151,12 +151,46 @@ if [ "$DRY_RUN" = true ]; then
     echo "---"
     echo ""
     
+    # Check for unpushed commits in dry-run
+    git fetch origin
+    LOCAL_COMMITS=$(git log origin/main..HEAD --oneline 2>/dev/null || git log origin/master..HEAD --oneline 2>/dev/null || echo "")
+    if [ -n "$LOCAL_COMMITS" ]; then
+        echo "Local commits that would be pushed:"
+        echo "$LOCAL_COMMITS"
+        echo ""
+    fi
+    
     echo "🚫 DRY RUN: No tag created, nothing pushed"
 else
     # Check if tag already exists
     if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
         echo "Error: Tag $TAG_NAME already exists!"
         exit 1
+    fi
+    
+    # Fetch to check for unpushed commits
+    echo "Checking for unpushed commits..."
+    git fetch origin
+    
+    # Determine the main branch name
+    MAIN_BRANCH="main"
+    if ! git show-ref --verify --quiet refs/remotes/origin/main; then
+        MAIN_BRANCH="master"
+    fi
+    
+    # Check if there are local commits to push
+    LOCAL_COMMITS=$(git log origin/$MAIN_BRANCH..HEAD --oneline 2>/dev/null || echo "")
+    if [ -n "$LOCAL_COMMITS" ]; then
+        echo "Pushing local commits first..."
+        echo "Commits to push:"
+        echo "$LOCAL_COMMITS"
+        echo ""
+        git push origin HEAD:$MAIN_BRANCH
+        echo "✓ Local commits pushed"
+        echo ""
+    else
+        echo "No local commits to push"
+        echo ""
     fi
     
     # Create tag with message
