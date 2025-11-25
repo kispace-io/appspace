@@ -13,16 +13,9 @@
         Pace.start();
     </script>
     <script type="module">
-        // TODO: Create an entry file (e.g., ./src/my-app-entry.ts) that:
-        // 1. Waits for document load
-        // 2. Imports your app definition: import "./my-app.ts";
-
-        // await import("./src/my-app-entry.ts");
-
-        // Your app definition should:
-        // 1. Import from @kispace-io/appspace/api (this bootstraps the framework)
-        // 2. Register the app with appLoaderService.registerApp(app, { autoStart: true, ... })
-        // The app loader will automatically start when autoStart: true is set
+        // Development entry point (for library development only)
+        // Replace this line with your own app entry point when building your own app
+        await import("./src/dev-entry.ts");
     </script>
 </head>
 <body>

@@ -3,4 +3,6 @@ export { KPart } from '../parts/k-part';
 export { KContainer } from '../parts/k-container';
 export { KDialogContent } from '../parts/k-dialog-content';
 export { KStandardApp } from '../apps/k-standard-app';
+// Import to register the custom element
+import '../apps/k-standard-app';
 
