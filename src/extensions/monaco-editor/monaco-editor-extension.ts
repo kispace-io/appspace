@@ -6,27 +6,11 @@ import {CID_PROMPT_ENHANCERS, type PromptEnhancer, type PromptEnhancerContributi
 import type {ExecutionContext} from "../../core/commandregistry";
 import PYTHON_PROMPT from "./py-programming-prompt.txt?raw";
 import JAVASCRIPT_PROMPT from "./js-programming-prompt.txt?raw";
-import './k-monaco-editor';
-
-const workerMap: Record<string, string> = {
-    'json': new URL('monaco-editor/esm/vs/language/json/json.worker.js', import.meta.url).href,
-    'css': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
-    'scss': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
-    'less': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
-    'html': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
-    'handlebars': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
-    'razor': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
-    'typescript': new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url).href,
-    'javascript': new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url).href,
-};
-
-self.MonacoEnvironment = {
-    getWorkerUrl(_: any, label: string) {
-        return workerMap[label] || new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url).href
-    }
-};
 
 editorRegistry.registerEditorInputHandler({
+    lazyInit: async () => {
+        await import('./k-monaco-editor');
+    },
     canHandle: input => input instanceof File,
     handle: async (input: File) => {
         const editorInput = {

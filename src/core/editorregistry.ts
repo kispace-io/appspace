@@ -24,7 +24,14 @@ export interface EditorInput {
 export interface EditorInputHandler {
     canHandle: (input: any) => boolean;
     handle: (input: any) => Promise<EditorInput>;
+    lazyInit?: () => Promise<void> | void;
     ranking?: number;  // Higher ranking = higher priority (default: 0)
+}
+
+interface RegisteredEditorInputHandler {
+    definition: EditorInputHandler;
+    initialized: boolean;
+    lazyInitPromise?: Promise<void>;
 }
 
 /**
@@ -65,7 +72,7 @@ export interface EditorContentProvider {
 }
 
 class EditorRegistry {
-    private editorInputHandlers: EditorInputHandler[] = [];
+    private editorInputHandlers: RegisteredEditorInputHandler[] = [];
     private listenersAttached = false;
     private cachedIconContributions: IconContribution[] | null = null;
     private signalCleanup?: () => void;
@@ -150,16 +157,44 @@ class EditorRegistry {
     }
 
     registerEditorInputHandler(editorInputHandler: EditorInputHandler) {
-        this.editorInputHandlers.push(editorInputHandler);
+        this.editorInputHandlers.push({
+            definition: editorInputHandler,
+            initialized: false
+        });
         // Sort by ranking (higher ranking first), default ranking is 0
-        this.editorInputHandlers.sort((a, b) => (b.ranking ?? 0) - (a.ranking ?? 0));
+        this.editorInputHandlers.sort((a, b) => {
+            const rankA = a.definition.ranking ?? 0;
+            const rankB = b.definition.ranking ?? 0;
+            return rankB - rankA;
+        });
+    }
+
+    private async ensureHandlerInitialized(entry: RegisteredEditorInputHandler): Promise<void> {
+        const handler = entry.definition;
+        if (!handler.lazyInit || entry.initialized) {
+            return;
+        }
+
+        if (!entry.lazyInitPromise) {
+            entry.lazyInitPromise = Promise.resolve(handler.lazyInit()).then(() => {
+                entry.initialized = true;
+                entry.lazyInitPromise = undefined;
+            }).catch(error => {
+                entry.lazyInitPromise = undefined;
+                throw error;
+            });
+        }
+
+        await entry.lazyInitPromise;
     }
 
     async handleInput(input: any) {
         // Handlers are already sorted by ranking, so iterate in order
         for (let i = 0; i < this.editorInputHandlers.length; i++) {
-            const editorInputHandler = this.editorInputHandlers[i];
+            const entry = this.editorInputHandlers[i];
+            const editorInputHandler = entry.definition;
             if (editorInputHandler.canHandle(input)) {
+                await this.ensureHandlerInitialized(entry);
                 return await editorInputHandler.handle(input);
             }
         }

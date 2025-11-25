@@ -1,6 +1,14 @@
 import {Directory, File, FileSysDirHandleResource, TOPIC_WORKSPACE_CHANGED, workspaceService} from "./filesys";
-import * as pipRequirements from "pip-requirements-js";
-const { parsePipRequirementsFile } = pipRequirements;
+type PipRequirementsModule = typeof import("pip-requirements-js");
+
+let pipRequirementsModulePromise: Promise<PipRequirementsModule> | null = null;
+
+async function getPipRequirementsModule(): Promise<PipRequirementsModule> {
+    if (!pipRequirementsModulePromise) {
+        pipRequirementsModulePromise = import("pip-requirements-js");
+    }
+    return pipRequirementsModulePromise;
+}
 import {publish} from "./events";
 import type {PyWorkerMessage, PyWorkerResponse} from "./pyworker";
 import PyWorker from "./pyworker?worker";
@@ -159,6 +167,7 @@ export class PyEnv {
         if (reqFile) {
             // @ts-ignore
             const reqContents: string = ((await reqFile.getContents()) as string).replaceAll("\r", "");
+            const { parsePipRequirementsFile } = await getPipRequirementsModule();
             const packages = parsePipRequirementsFile(reqContents)
                 .filter(p => "name" in p)
                 .map(p => (p as any).name);

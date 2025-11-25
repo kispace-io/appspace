@@ -11,6 +11,24 @@ import {workspaceService} from "../../core/filesys";
 import logger from '../../core/logger';
 import {pythonPackageManagerService} from "../python-package-manager/package-manager-extension";
 
+const workerMap: Record<string, string> = {
+    'json': new URL('monaco-editor/esm/vs/language/json/json.worker.js', import.meta.url).href,
+    'css': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
+    'scss': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
+    'less': new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url).href,
+    'html': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
+    'handlebars': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
+    'razor': new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url).href,
+    'typescript': new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url).href,
+    'javascript': new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url).href,
+};
+
+self.MonacoEnvironment = {
+    getWorkerUrl(_: any, label: string) {
+        return workerMap[label] || new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url).href;
+    }
+};
+
 @customElement('k-monaco-editor')
 export class KMonacoEditor extends KPart implements EditorContentProvider {
     @property({attribute: false})

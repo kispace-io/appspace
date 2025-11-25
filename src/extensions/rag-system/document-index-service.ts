@@ -1,8 +1,4 @@
-import { createRxDatabase, RxDatabase, RxCollection, addRxPlugin } from 'rxdb';
-import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
-import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
-import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
-import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
+import type { RxDatabase, RxCollection } from 'rxdb';
 import { rootContext } from '../../core/di';
 import { workspaceService, File, Directory, FileContentType, TOPIC_WORKSPACE_CONNECTED, TOPIC_WORKSPACE_CHANGED } from '../../core/filesys';
 import { subscribe } from '../../core/events';
@@ -12,10 +8,7 @@ import { VectorEmbedding, generateSampleVectors, calculateIndexValues, euclidean
 import { VECTOR_SEARCH_CONFIG, INDEX_FIELD_NAMES } from './utils/constants';
 import { DocumentChunker, DocumentChunk } from './chunkers/document-chunker';
 import { DocumentExtractor } from './extractors/document-extractor';
-// Add required RxDB plugins
-addRxPlugin(RxDBQueryBuilderPlugin);
-addRxPlugin(RxDBMigrationSchemaPlugin);
-addRxPlugin(RxDBUpdatePlugin);
+import { getRxDbModules } from './rxdb-loader';
 
 const logger = createLogger('DocumentIndexService');
 
@@ -78,9 +71,11 @@ class DocumentIndexService {
         logger.info('Initializing document index service with RxDB...');
 
         try {
-            this.db = await createRxDatabase({
+            const { rxdb, storageDexie } = await getRxDbModules();
+
+            this.db = await rxdb.createRxDatabase({
                 name: 'document-index-db',
-                storage: getRxStorageDexie(),
+                storage: storageDexie.getRxStorageDexie(),
                 ignoreDuplicate: true,
             });
 

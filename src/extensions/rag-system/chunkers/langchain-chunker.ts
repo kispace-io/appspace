@@ -1,7 +1,7 @@
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { createLogger } from '../../../core/logger';
 import { SNIPPET_LENGTHS } from '../utils/constants';
 import type { DocumentChunk, ChunkingOptions, IDocumentChunker } from './chunker-interface';
+type RecursiveCharacterTextSplitter = import('@langchain/textsplitters').RecursiveCharacterTextSplitter;
 
 const logger = createLogger('LangChainChunker');
 
@@ -16,28 +16,34 @@ function countWords(text: string): number {
 }
 
 export class LangChainChunker implements IDocumentChunker {
-    private readonly textSplitter: RecursiveCharacterTextSplitter;
+    private textSplitter: RecursiveCharacterTextSplitter | null = null;
     private readonly chunkSize: number;
     private readonly chunkOverlap: number;
 
     constructor(options: ChunkingOptions = {}) {
         this.chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
         this.chunkOverlap = options.chunkOverlap ?? DEFAULT_CHUNK_OVERLAP;
+    }
 
-        this.textSplitter = new RecursiveCharacterTextSplitter({
-            chunkSize: this.chunkSize,
-            chunkOverlap: this.chunkOverlap,
-            lengthFunction: countWords,
-            separators: [
-                '\n\n',      // Paragraphs
-                '\n',        // Lines
-                '. ',        // Sentences
-                '! ',        // Exclamations
-                '? ',        // Questions
-                ' ',         // Words (last separator - ensures we never split words)
-            ],
-            keepSeparator: false,
-        });
+    private async getTextSplitter(): Promise<RecursiveCharacterTextSplitter> {
+        if (!this.textSplitter) {
+            const { RecursiveCharacterTextSplitter } = await import('@langchain/textsplitters');
+            this.textSplitter = new RecursiveCharacterTextSplitter({
+                chunkSize: this.chunkSize,
+                chunkOverlap: this.chunkOverlap,
+                lengthFunction: countWords,
+                separators: [
+                    '\n\n',
+                    '\n',
+                    '. ',
+                    '! ',
+                    '? ',
+                    ' ',
+                ],
+                keepSeparator: false,
+            });
+        }
+        return this.textSplitter;
     }
 
     async chunkDocument(
@@ -46,7 +52,8 @@ export class LangChainChunker implements IDocumentChunker {
         fileName: string
     ): Promise<DocumentChunk[]> {
         try {
-            const chunks = await this.textSplitter.splitText(content);
+            const splitter = await this.getTextSplitter();
+            const chunks = await splitter.splitText(content);
             
             const documentChunks: DocumentChunk[] = [];
             let currentOffset = 0;

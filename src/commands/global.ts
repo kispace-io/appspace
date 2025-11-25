@@ -168,7 +168,8 @@ registerAll({
         "parameters": []
     },
     handler: {
-        execute: _context => {
+        execute: async _context => {
+            await import("../extensions/monaco-editor/k-monaco-editor");
             const editorInput = {
                 title: "settings.json",
                 data: {

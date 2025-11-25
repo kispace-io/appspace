@@ -1,11 +1,9 @@
-import { pipeline, env, type FeatureExtractionPipeline } from '@xenova/transformers';
+import type { FeatureExtractionPipeline } from '@xenova/transformers';
 import { createLogger } from '../../core/logger';
+import { inBrowserMLService } from '../in-browser-ml/in-browser-ml-service';
+import { MLModel, MLTask } from '../in-browser-ml/ml-models';
 
 const logger = createLogger('EmbeddingService');
-
-env.allowRemoteModels = true;
-env.allowLocalModels = false;
-(env as any).remoteHost = 'https://huggingface.co';
 
 export interface EmbeddingOptions {
     pooling?: 'mean' | 'cls' | 'none';
@@ -14,7 +12,7 @@ export interface EmbeddingOptions {
 
 class EmbeddingService {
     private pipePromise?: Promise<FeatureExtractionPipeline>;
-    private modelName = 'Xenova/all-MiniLM-L6-v2';
+    private modelName = MLModel.FEATURE_EXTRACTION;
     private readonly EMBEDDING_DIMENSION = 384;
     private readonly DEFAULT_OPTIONS: EmbeddingOptions = {
         pooling: 'mean',
@@ -35,10 +33,11 @@ class EmbeddingService {
         logger.info(`Initializing embedding service with model: ${this.modelName}`);
         
         try {
-            // Type assertion needed due to complex union types in @xenova/transformers
-            this.pipePromise = (pipeline('feature-extraction' as any, this.modelName, {
-                quantized: false,
-            }) as any) as Promise<FeatureExtractionPipeline>;
+            this.pipePromise = inBrowserMLService.getPipeline(
+                MLTask.FEATURE_EXTRACTION,
+                this.modelName,
+                { quantized: false }
+            ) as Promise<FeatureExtractionPipeline>;
             await this.pipePromise;
             logger.info('Embedding service initialized successfully');
         } catch (error: any) {

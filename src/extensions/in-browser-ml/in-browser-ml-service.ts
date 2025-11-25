@@ -1,6 +1,6 @@
-import { pipeline, env } from '@xenova/transformers';
 import { createLogger } from '../../core/logger';
 import { MLTask, MLModel, getModelForTask } from './ml-models';
+import { getTransformersModule, setTransformersAuthToken } from './transformers-loader';
 
 const logger = createLogger('InBrowserMLService');
 
@@ -14,12 +14,7 @@ export class InBrowserMLService {
     private pipelines: Map<string, any> = new Map();
     private loadingPipelines: Set<string> = new Set();
 
-    private constructor() {
-        // Configure transformers.js environment
-        env.allowRemoteModels = true;
-        env.allowLocalModels = false;
-        (env as any).remoteHost = 'https://huggingface.co';
-    }
+    private constructor() {}
 
     static getInstance(): InBrowserMLService {
         if (!InBrowserMLService.instance) {
@@ -32,12 +27,13 @@ export class InBrowserMLService {
      * Set Hugging Face token for authenticated model access
      */
     setAuthToken(token: string | null): void {
-        if (token && token.trim()) {
-            (env as any).useAuthToken = token.trim();
-            logger.info('Hugging Face token set for authenticated model access');
-        } else {
-            (env as any).useAuthToken = null;
-        }
+        setTransformersAuthToken(token).then(() => {
+            if (token && token.trim()) {
+                logger.info('Hugging Face token set for authenticated model access');
+            }
+        }).catch(error => {
+            logger.warn(`Failed to configure auth token: ${error instanceof Error ? error.message : String(error)}`);
+        });
     }
 
     /**
@@ -78,7 +74,7 @@ export class InBrowserMLService {
         this.loadingPipelines.add(pipelineKey);
         try {
             logger.info(`Loading transformers.js pipeline: ${taskStr} with model ${modelStr}...`);
-            // pipeline accepts string for task type, cast to any to allow enum values
+            const { pipeline } = await getTransformersModule();
             const pipe = await pipeline(taskStr as any, modelStr, {
                 quantized: true,
                 ...options
