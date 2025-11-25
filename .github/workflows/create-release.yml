@@ -17,7 +17,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ github.token }}
       
       - name: Extract version from tag
         id: version
@@ -40,27 +39,15 @@ jobs:
           echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
       
-      - name: Authenticate GitHub CLI
-        run: |
-          echo "${{ github.token }}" | gh auth login --with-token
-      
       - name: Create GitHub Release
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          BODY="${{ steps.tag_message.outputs.message }}"
-          REPO="${{ github.repository }}"
-          
-          # Check if release already exists
-          if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
-            echo "Release $TAG already exists, skipping creation"
-            exit 0
-          fi
-          
-          # Create release using GitHub CLI
-          echo "$BODY" | gh release create "$TAG" \
-            --repo "$REPO" \
-            --title "Release $TAG" \
-            --notes-file -
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body: ${{ steps.tag_message.outputs.message }}
+          draft: false
+          prerelease: false
+          make_latest: true
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
