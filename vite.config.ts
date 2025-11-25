@@ -45,6 +45,9 @@ export default defineConfig({
         'extensions/rag-system/index': path.resolve(__dirname, 'src/extensions/rag-system/index.ts'),
         'widgets/index': path.resolve(__dirname, 'src/widgets/index.ts'),
         'parts/index': path.resolve(__dirname, 'src/parts/index.ts'),
+        'externals/webawesome': path.resolve(__dirname, 'src/externals/webawesome.ts'),
+        'externals/lit': path.resolve(__dirname, 'src/externals/lit-exports.ts'),
+        'externals/third-party': path.resolve(__dirname, 'src/externals/third-party.ts'),
       },
       formats: ['es'],
       fileName: (format, entryName) => {

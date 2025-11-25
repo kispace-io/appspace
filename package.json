@@ -68,8 +68,8 @@
       "import": "./dist/externals/webawesome.js"
     },
     "./externals/lit": {
-      "types": "./dist/externals/lit-exports.d.ts",
-      "import": "./dist/externals/lit-exports.js"
+      "types": "./dist/externals/lit.d.ts",
+      "import": "./dist/externals/lit.js"
     },
     "./externals/third-party": {
       "types": "./dist/externals/third-party.d.ts",
