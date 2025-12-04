@@ -42,6 +42,7 @@ export default defineConfig({
         'externals/webawesome': path.resolve(__dirname, 'src/externals/webawesome.ts'),
         'externals/lit': path.resolve(__dirname, 'src/externals/lit.ts'),
         'externals/third-party': path.resolve(__dirname, 'src/externals/third-party.ts'),
+        'core/events': path.resolve(__dirname, 'src/core/events.ts'),
       },
       formats: ['es'],
       fileName: (format, entryName) => {

@@ -79,6 +79,10 @@
     "./externals/third-party": {
       "types": "./dist/externals/third-party.d.ts",
       "import": "./dist/externals/third-party.js"
+    },
+    "./core/events": {
+      "types": "./dist/core/events.d.ts",
+      "import": "./dist/core/events.js"
     }
   },
   "files": [
