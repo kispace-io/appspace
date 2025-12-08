@@ -146,7 +146,7 @@ class DialogService {
                 
                 try {
                     const result = dialogContentElement ? dialogContentElement.getResult() : undefined;
-                    await contribution.onButton('close', result, state);
+                    await contribution.onButton('close', result, stateWithClose);
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : String(error);
                     logger.error(`Error executing close callback for dialog "${dialogId}": ${errorMessage}`);
@@ -159,7 +159,7 @@ class DialogService {
             const handleButtonClick = async (buttonId: string) => {
                 try {
                     const result = dialogContentElement ? dialogContentElement.getResult() : undefined;
-                    const shouldClose = await contribution.onButton(buttonId, result, state);
+                    const shouldClose = await contribution.onButton(buttonId, result, stateWithClose);
                     
                     if (shouldClose !== false) {
                         cleanup();
@@ -174,6 +174,11 @@ class DialogService {
             const buttons = contribution.buttons && contribution.buttons.length > 0 
                 ? contribution.buttons 
                 : [OK_BUTTON];
+
+            if (state && typeof state === 'object') {
+                (state as any).close = cleanup;
+            }
+            const stateWithClose = { ...state, close: cleanup };
 
             const template = html`
                 <wa-dialog label="${contribution.label || dialogId}" open @wa-request-close=${cleanup}>

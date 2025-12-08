@@ -4,7 +4,8 @@ import {
     SIDEBAR_MAIN,
     SIDEBAR_AUXILIARY,
     TOOLBAR_BOTTOM,
-    TOOLBAR_BOTTOM_END
+    TOOLBAR_BOTTOM_END,
+    TOOLBAR_MAIN_RIGHT
 } from "../core/constants";
 
 contributionRegistry.registerContribution(SIDEBAR_MAIN, {
@@ -49,5 +50,10 @@ contributionRegistry.registerContribution(TOOLBAR_BOTTOM_END, {
 contributionRegistry.registerContribution(TOOLBAR_BOTTOM_END, {
     label: "Language",
     html: () => html`<k-language-selector></k-language-selector>`
+});
+
+contributionRegistry.registerContribution(TOOLBAR_MAIN_RIGHT, {
+    label: "App Switcher",
+    html: () => html`<k-app-switcher></k-app-switcher>`
 });
 

@@ -17,6 +17,7 @@ import {rootContext} from "./di";
 import {createLogger} from "./logger";
 import {extensionRegistry, Extension} from "./extensionregistry";
 import {contributionRegistry, Contribution} from "./contributionregistry";
+import {appSettings} from "./settingsservice";
 
 const logger = createLogger('AppLoader');
 
@@ -215,6 +216,7 @@ class AppLoaderService {
     private defaultAppId?: string;
     private container: HTMLElement = document.body;
     private systemRequiredExtensions: Set<string> = new Set();
+    private static readonly PREFERRED_APP_KEY = 'preferredAppId';
     
     /**
      * Register an application with the framework.
@@ -377,7 +379,7 @@ class AppLoaderService {
             }
         }
         
-        const appToLoad = this.selectAppToLoad({
+        const appToLoad = await this.selectAppToLoad({
             appIdFromUrl,
             appIdFromPath,
             appIdFromAppUrl,
@@ -476,6 +478,9 @@ class AppLoaderService {
         if (container) {
             this.renderApp(container);
         }
+        
+        // Dispatch event for components to react to app changes
+        window.dispatchEvent(new CustomEvent('app-loaded', { detail: { appId: app.id } }));
     }
     
     /**
@@ -532,20 +537,51 @@ class AppLoaderService {
     }
     
     /**
+     * Get the preferred app ID from settings.
+     */
+    async getPreferredAppId(): Promise<string | undefined> {
+        try {
+            return await appSettings.get(AppLoaderService.PREFERRED_APP_KEY);
+        } catch (error) {
+            logger.debug('Failed to get preferred app ID from settings:', error);
+            return undefined;
+        }
+    }
+    
+    /**
+     * Set the preferred app ID and persist it to settings.
+     */
+    async setPreferredAppId(appId: string): Promise<void> {
+        if (!this.apps.has(appId)) {
+            throw new Error(`App '${appId}' not found. Make sure it's registered.`);
+        }
+        
+        try {
+            await appSettings.set(AppLoaderService.PREFERRED_APP_KEY, appId);
+            this.defaultAppId = appId;
+            logger.info(`Set preferred app to: ${appId}`);
+        } catch (error) {
+            logger.error('Failed to persist preferred app ID:', error);
+            throw error;
+        }
+    }
+    
+    /**
      * Select which app to load based on priority:
      * 1. appId URL parameter (?appId=...)
      * 2. App ID from current page URL path (/geospace)
      * 3. App ID extracted from app URL parameter (?app=...)
      * 4. App registered by extension
-     * 5. Default app ID
-     * 6. First registered app
+     * 5. Preferred app ID from settings
+     * 6. Default app ID
+     * 7. First registered app
      */
-    private selectAppToLoad(options: {
+    private async selectAppToLoad(options: {
         appIdFromUrl: string | null;
         appIdFromPath: string | undefined;
         appIdFromAppUrl: string | undefined;
         appsBeforeExtension: number;
-    }): string | undefined {
+    }): Promise<string | undefined> {
         const { appIdFromUrl, appIdFromPath, appIdFromAppUrl, appsBeforeExtension } = options;
         
         if (appIdFromUrl) {
@@ -578,6 +614,12 @@ class AppLoaderService {
                 logger.info(`Loading app registered by extension: ${app.name} (${app.id})`);
                 return app.id;
             }
+        }
+        
+        const preferredAppId = await this.getPreferredAppId();
+        if (preferredAppId && this.apps.has(preferredAppId)) {
+            logger.info(`Loading preferred app from settings: ${preferredAppId}`);
+            return preferredAppId;
         }
         
         if (this.defaultAppId) {
