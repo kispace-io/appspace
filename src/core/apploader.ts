@@ -543,7 +543,7 @@ class AppLoaderService {
         try {
             return await appSettings.get(AppLoaderService.PREFERRED_APP_KEY);
         } catch (error) {
-            logger.debug('Failed to get preferred app ID from settings:', error);
+            logger.debug(`Failed to get preferred app ID from settings: ${getErrorMessage(error)}`);
             return undefined;
         }
     }
@@ -561,7 +561,7 @@ class AppLoaderService {
             this.defaultAppId = appId;
             logger.info(`Set preferred app to: ${appId}`);
         } catch (error) {
-            logger.error('Failed to persist preferred app ID:', error);
+            logger.error(`Failed to persist preferred app ID: ${getErrorMessage(error)}`);
             throw error;
         }
     }
