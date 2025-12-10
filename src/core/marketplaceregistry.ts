@@ -2,17 +2,22 @@ import {appSettings} from "./settingsservice";
 import {publish, subscribe} from "./events";
 import {createLogger} from "./logger";
 import {extensionRegistry, Extension} from "./extensionregistry";
-import {appLoaderService} from "./apploader";
+import {appLoaderService, AppDefinition} from "./apploader";
 import {rootContext} from "./di";
 
 const logger = createLogger('MarketplaceRegistry');
 
 export const TOPIC_MARKETPLACE_CHANGED = "events/marketplaceregistry/changed";
 
+export interface MarketplaceApp extends Omit<AppDefinition, 'render' | 'initialize' | 'dispose'> {
+    url: string;
+}
+
 export interface MarketplaceCatalog {
     name?: string;
     description?: string;
-    extensions: Extension[];
+    extensions?: Extension[];
+    apps?: MarketplaceApp[];
 }
 
 const KEY_CATALOG_URLS = "marketplace.catalogUrls";
@@ -66,11 +71,9 @@ class MarketplaceRegistry {
         logger.info(`Added catalog URL: ${url}`);
 
         try {
-            await this.fetchCatalog(url);
-            // Register extensions from the newly fetched catalog
-            this.registerMarketplaceExtensions();
+            await this.refreshCatalogs();
         } catch (error) {
-            logger.warn(`Failed to fetch catalog immediately after adding: ${error}`);
+            logger.warn(`Failed to refresh catalogs immediately after adding: ${error}`);
         }
     }
 
@@ -120,17 +123,21 @@ class MarketplaceRegistry {
 
                 const data = await response.json() as MarketplaceCatalog;
 
-                if (!data.extensions || !Array.isArray(data.extensions)) {
-                    throw new Error('Invalid catalog format: extensions array is required');
+                if ((!data.extensions || !Array.isArray(data.extensions)) && 
+                    (!data.apps || !Array.isArray(data.apps))) {
+                    throw new Error('Invalid catalog format: at least one of extensions or apps array is required');
                 }
 
                 const catalog: MarketplaceCatalog = {
                     name: data.name,
                     description: data.description,
-                    extensions: data.extensions,
+                    extensions: data.extensions || [],
+                    apps: data.apps || [],
                 };
 
-                logger.debug(`Successfully fetched catalog from ${url}: ${catalog.extensions.length} extensions`);
+                const extCount = catalog.extensions?.length || 0;
+                const appCount = catalog.apps?.length || 0;
+                logger.debug(`Successfully fetched catalog from ${url}: ${extCount} extensions, ${appCount} apps`);
                 return catalog;
             } catch (error) {
                 logger.error(`Failed to fetch catalog from ${url}: ${error}`);
@@ -156,22 +163,46 @@ class MarketplaceRegistry {
 
         const catalogs = await Promise.allSettled(promises);
         
-        // Register all marketplace extensions from successfully fetched catalogs
+        // Register all marketplace extensions and apps from successfully fetched catalogs
         catalogs.forEach((result, index) => {
             if (result.status === 'fulfilled' && result.value) {
                 const catalog = result.value;
-                catalog.extensions.forEach(marketplaceExt => {
-                    // Only register if not already registered
-                    if (!extensionRegistry.getExtensions().find(e => e.id === marketplaceExt.id)) {
-                        // Mark as external extension
-                        const extension: Extension = {
-                            ...marketplaceExt,
-                            external: true
-                        };
-                        extensionRegistry.registerExtension(extension);
-                        logger.debug(`Registered marketplace extension: ${marketplaceExt.id}`);
-                    }
-                });
+                
+                // Register extensions
+                if (catalog.extensions) {
+                    catalog.extensions.forEach(marketplaceExt => {
+                        // Only register if not already registered
+                        if (!extensionRegistry.getExtensions().find(e => e.id === marketplaceExt.id)) {
+                            // Mark as external extension
+                            const extension: Extension = {
+                                ...marketplaceExt,
+                                external: true
+                            };
+                            extensionRegistry.registerExtension(extension);
+                            logger.debug(`Registered marketplace extension: ${marketplaceExt.id}`);
+                        }
+                    });
+                }
+                
+                // Register apps
+                if (catalog.apps) {
+                    catalog.apps.forEach(marketplaceApp => {
+                        // Only register if not already registered
+                        if (!appLoaderService.getRegisteredApps().find(a => a.id === marketplaceApp.id)) {
+                            // Create app definition from marketplace app (without render/initialize/dispose)
+                            // Store the URL in metadata for later reference
+                            const app: AppDefinition = {
+                                ...marketplaceApp,
+                                metadata: {
+                                    ...marketplaceApp.metadata,
+                                    marketplaceUrl: marketplaceApp.url,
+                                },
+                            };
+                            appLoaderService.registerApp(app);
+                            logger.debug(`Registered marketplace app: ${marketplaceApp.id} from ${marketplaceApp.url}`);
+                        }
+                    });
+                }
             }
         });
         
@@ -229,6 +260,61 @@ class MarketplaceRegistry {
     isMarketplaceExtension(extensionId: string): boolean {
         const extension = extensionRegistry.getExtensions().find(e => e.id === extensionId);
         return extension !== undefined && extension.external === true;
+    }
+
+    getMarketplaceApps(): AppDefinition[] {
+        return appLoaderService.getRegisteredApps().filter(app => {
+            const marketplaceApp = this.getMarketplaceApp(app.id);
+            return marketplaceApp !== undefined;
+        });
+    }
+
+    getMarketplaceApp(appId: string): MarketplaceApp | undefined {
+        const app = appLoaderService.getRegisteredApps().find(a => a.id === appId);
+        if (!app) {
+            return undefined;
+        }
+        
+        // Check if app has marketplace URL in metadata
+        const marketplaceUrl = app.metadata?.marketplaceUrl;
+        if (!marketplaceUrl || typeof marketplaceUrl !== 'string') {
+            return undefined;
+        }
+        
+        return {
+            id: app.id,
+            name: app.name,
+            version: app.version,
+            description: app.description,
+            metadata: app.metadata,
+            extensions: app.extensions,
+            contributions: app.contributions,
+            releaseHistory: app.releaseHistory,
+            url: marketplaceUrl,
+        } as MarketplaceApp;
+    }
+
+    async installApp(app: MarketplaceApp): Promise<void> {
+        const existingApp = appLoaderService.getRegisteredApps().find(a => a.id === app.id);
+        if (existingApp) {
+            logger.info(`App ${app.id} is already registered`);
+            return;
+        }
+
+        logger.info(`Installing marketplace app: ${app.name} from ${app.url}`);
+
+        try {
+            const loadedApp = await appLoaderService.loadAppFromUrl(app.url);
+            appLoaderService.registerApp(loadedApp);
+            logger.info(`Successfully installed marketplace app: ${app.id}`);
+        } catch (error) {
+            logger.error(`Failed to install marketplace app ${app.id}: ${error}`);
+            throw error;
+        }
+    }
+
+    isMarketplaceApp(appId: string): boolean {
+        return this.getMarketplaceApp(appId) !== undefined;
     }
 }
 
