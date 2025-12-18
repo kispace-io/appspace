@@ -4,6 +4,7 @@ import {createLogger} from "./logger";
 import {extensionRegistry, Extension} from "./extensionregistry";
 import {appLoaderService, AppDefinition} from "./apploader";
 import {rootContext} from "./di";
+import {openVSXClient, OpenVSXExtension} from "./open-vsx/openvsx-client";
 
 const logger = createLogger('MarketplaceRegistry');
 
@@ -173,13 +174,13 @@ class MarketplaceRegistry {
                     catalog.extensions.forEach(marketplaceExt => {
                         // Only register if not already registered
                         if (!extensionRegistry.getExtensions().find(e => e.id === marketplaceExt.id)) {
-                            // Mark as external extension
+                            // Mark as external extension, preserve vsix flag if present
                             const extension: Extension = {
                                 ...marketplaceExt,
                                 external: true
                             };
                             extensionRegistry.registerExtension(extension);
-                            logger.debug(`Registered marketplace extension: ${marketplaceExt.id}`);
+                            logger.debug(`Registered marketplace extension: ${marketplaceExt.id}${extension.url?.endsWith('.vsix') ? ' (VSIX)' : ''}`);
                         }
                     });
                 }
@@ -252,9 +253,45 @@ class MarketplaceRegistry {
             external: true
         };
         extensionRegistry.registerExtension(externalExtension);
-        await appLoaderService.loadExtensionFromUrl(extension.url!);
+        
+        if (extension.url?.endsWith('.vsix')) {
+            await extensionRegistry.enable(extension.id);
+        } else {
+            await appLoaderService.loadExtensionFromUrl(extension.url!);
+        }
         
         logger.info(`Successfully installed marketplace extension: ${extension.id}`);
+    }
+
+    async installOpenVSXExtension(openVSXExtension: OpenVSXExtension): Promise<void> {
+        const extensionId = openVSXClient.getExtensionId(openVSXExtension);
+        
+        if (extensionRegistry.isEnabled(extensionId)) {
+            logger.info(`Open VSX extension ${extensionId} is already installed`);
+            return;
+        }
+
+        logger.info(`Installing Open VSX extension: ${openVSXExtension.metadata?.displayName || extensionId}`);
+
+        const downloadUrl = openVSXClient.getDownloadUrl(openVSXExtension);
+        if (!downloadUrl) {
+            throw new Error(`No download URL available for extension ${extensionId}`);
+        }
+
+        const extension: Extension = {
+            id: extensionId,
+            name: openVSXExtension.metadata?.displayName || openVSXExtension.name,
+            description: openVSXExtension.metadata?.description || openVSXExtension.description,
+            version: openVSXExtension.version,
+            author: openVSXExtension.publisher || openVSXExtension.metadata?.publisher,
+            url: downloadUrl,
+            external: true,
+        };
+
+        extensionRegistry.registerExtension(extension);
+        await extensionRegistry.enable(extensionId);
+        
+        logger.info(`Successfully installed Open VSX extension: ${extensionId}`);
     }
 
     isMarketplaceExtension(extensionId: string): boolean {

@@ -237,10 +237,29 @@ class ExtensionRegistry {
                     }
                 }
                 
-                const module = await taskService.runAsync("Loading extension: " + extension.name, () => {
+                const module = await taskService.runAsync("Loading extension: " + extension.name, async () => {
                     if (extension.loader) {
                         return extension.loader()
                     } else if (extension.url) {
+                        if (extension.url?.endsWith('.vsix')) {
+                            const {vsixExtensionLoader} = await import("./open-vsx/vsix-extension-loader");
+                            const {openVSXClient} = await import("./open-vsx/openvsx-client");
+                            
+                            const extensionId = extension.id;
+                            const [namespace, name] = extensionId.split('.');
+                            if (namespace && name) {
+                                try {
+                                    const openVSXExtension = await openVSXClient.getExtension(namespace, name);
+                                    await vsixExtensionLoader.loadFromOpenVSX(openVSXExtension);
+                                } catch (error) {
+                                    logger.warn(`Could not fetch Open VSX metadata for ${extensionId}, loading from URL: ${error}`);
+                                    await vsixExtensionLoader.loadFromUrl(extension.url);
+                                }
+                            } else {
+                                await vsixExtensionLoader.loadFromUrl(extension.url);
+                            }
+                            return { default: () => {} };
+                        }
                         return import(extension.url)
                     }
                 })
