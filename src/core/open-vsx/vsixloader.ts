@@ -97,7 +97,7 @@ export class VSIXLoader {
                 throw new Error(`Extension ${extensionId} does not have a browser entry point. Only web extensions are supported.`);
             }
             
-            const entryPoint = manifest.browser;
+            let entryPoint = manifest.browser;
             logger.debug(`Using browser entry point (web extension): ${entryPoint}`);
             
             entryPoint = entryPoint.replace(/^\.\//, '');
