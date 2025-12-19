@@ -92,18 +92,13 @@ export class VSIXLoader {
             const version = extension?.version || manifest.version;
 
             const files = new Map<string, string>();
-            let entryPoint: string;
-            
-            if (manifest.browser) {
-                entryPoint = manifest.browser;
-                logger.debug(`Using browser entry point (web extension): ${entryPoint}`);
-            } else if (manifest.main) {
-                entryPoint = manifest.main;
-                logger.debug(`Using main entry point (Node.js extension): ${entryPoint}`);
-            } else {
-                entryPoint = "extension.js";
-                logger.debug(`No entry point specified, using default: ${entryPoint}`);
+            // Only support web extensions - must have browser entry point
+            if (!manifest.browser) {
+                throw new Error(`Extension ${extensionId} does not have a browser entry point. Only web extensions are supported.`);
             }
+            
+            const entryPoint = manifest.browser;
+            logger.debug(`Using browser entry point (web extension): ${entryPoint}`);
             
             entryPoint = entryPoint.replace(/^\.\//, '');
 
@@ -151,7 +146,7 @@ export class VSIXLoader {
 
             const isWebExtension = this.isWebExtension(manifest);
             if (!isWebExtension) {
-                logger.warn(`Extension ${extensionId} is not a web extension. It may require Node.js APIs that are not available in the browser.`);
+                logger.warn(`Extension ${extensionId} is not a web extension. Only web extensions (with browser entry point) are supported.`);
             }
 
             const loadedVSIX: LoadedVSIX = {
@@ -296,22 +291,6 @@ export class VSIXLoader {
         return false;
     }
     
-    isUniversalExtension(manifest: VSIXManifest): boolean {
-        if (manifest.main && manifest.browser) {
-            return true;
-        }
-        
-        if (manifest.extensionKind) {
-            const kinds = manifest.extensionKind;
-            const hasWeb = kinds.includes('web') || kinds.includes('ui');
-            const hasWorkspace = kinds.includes('workspace');
-            if (hasWeb && hasWorkspace) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
 }
 
 export const vsixLoader = new VSIXLoader();

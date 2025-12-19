@@ -3,7 +3,6 @@ import {vsixLoader, LoadedVSIX} from "./vsixloader";
 import {openVSXClient, OpenVSXExtension} from "./openvsx-client";
 import {createVSCodeAPI} from "./vscode-api-adapter";
 import {commandRegistry, Command, Handler} from "../commandregistry";
-import {getNodePolyfill, getBufferPolyfill} from "./nodejs-polyfills";
 
 const logger = createLogger('VSIXExtensionLoader');
 
@@ -36,17 +35,14 @@ export class VSIXExtensionLoader {
         try {
             logger.debug(`Activating VSIX extension: ${loadedVSIX.extensionId}`);
             
-            const isUniversal = vsixLoader.isUniversalExtension(loadedVSIX.manifest);
-            
-            if (loadedVSIX.isWebExtension === false && !isUniversal) {
-                const errorMsg = `Extension ${loadedVSIX.extensionId} is not a web extension and requires Node.js APIs that are not available in the browser.`;
+            // Only support web extensions - they don't need Node.js polyfills
+            if (!loadedVSIX.isWebExtension) {
+                const errorMsg = `Extension ${loadedVSIX.extensionId} is not a web extension. Only web extensions (with browser entry point) are supported.`;
                 logger.error(errorMsg);
                 throw new Error(errorMsg);
             }
             
-            if (isUniversal) {
-                logger.info(`Loading Universal extension ${loadedVSIX.extensionId} in web context`);
-            }
+            logger.info(`Loading web extension ${loadedVSIX.extensionId}`);
             
             const entryPointCode = vsixLoader.getEntryPointCode(loadedVSIX);
             if (!entryPointCode) {
@@ -155,18 +151,10 @@ export class VSIXExtensionLoader {
                 return vscode;
             }
             
-            const nodePolyfill = getNodePolyfill(moduleName);
-            if (nodePolyfill !== null) {
-                logger.info(`[Module Require] Returning Node.js polyfill for: ${moduleName}`);
-                if (typeof nodePolyfill === 'function') {
-                    return nodePolyfill();
-                }
-                return nodePolyfill;
-            }
-            
+            // Web extensions shouldn't need Node.js polyfills
             if (moduleName === 'Buffer' || moduleName === 'buffer') {
-                logger.info(`[Module Require] Returning Buffer polyfill`);
-                return getBufferPolyfill();
+                logger.warn(`[Module Require] Buffer requested - web extensions should use Uint8Array instead`);
+                return globalThis.Buffer || null;
             }
             
             const file = this.resolveModulePath(loadedVSIX, moduleName);
@@ -180,12 +168,11 @@ export class VSIXExtensionLoader {
         };
 
         try {
-            const BufferPolyfill = getBufferPolyfill();
-            
             logger.info(`Creating activate function for ${loadedVSIX.extensionId}, code length: ${code.length} chars`);
             logger.info(`First 500 chars of extension code: ${code.substring(0, 500)}${code.length > 500 ? '...' : ''}`);
             
-            const factory = new Function('exports', 'require', 'module', '__filename', '__dirname', 'vscode', 'context', 'Buffer', code);
+            // Web extensions don't need Buffer polyfill - they should use browser APIs
+            const factory = new Function('exports', 'require', 'module', '__filename', '__dirname', 'vscode', 'context', code);
             
             logger.info(`Executing extension code for ${loadedVSIX.extensionId}...`);
             
@@ -204,7 +191,7 @@ export class VSIXExtensionLoader {
             };
             
             try {
-                factory(moduleExports, moduleRequire, {exports: moduleExports}, '', '', vscode, context, BufferPolyfill);
+                factory(moduleExports, moduleRequire, {exports: moduleExports}, '', '', vscode, context);
                 logger.info(`Extension code executed successfully`);
                 
                 if (errors.length > 0) {
@@ -308,29 +295,25 @@ export class VSIXExtensionLoader {
                 return vscode;
             }
             
-            const nodePolyfill = getNodePolyfill(moduleName);
-            if (nodePolyfill !== null) {
-                if (typeof nodePolyfill === 'function') {
-                    return nodePolyfill();
-                }
-                return nodePolyfill;
-            }
-            
+            // Web extensions shouldn't need Node.js modules
             if (moduleName === 'Buffer' || moduleName === 'buffer') {
-                return getBufferPolyfill();
+                logger.warn(`[Module Require] Buffer requested in web extension - using global Buffer if available`);
+                return globalThis.Buffer || null;
             }
             
             const file = vsixLoader.getFile(loadedVSIX, moduleName);
             if (file) {
                 return this.evaluateModule(file, vscode, context, loadedVSIX);
             }
+            
+            logger.warn(`[Module Require] Module not found: ${moduleName} (web extensions should not require Node.js modules)`);
             return {};
         };
 
         try {
-            const factory = new Function('exports', 'require', 'module', '__filename', '__dirname', 'vscode', 'context', 'Buffer', code);
-            const BufferPolyfill = getBufferPolyfill();
-            factory(moduleExports, moduleRequire, {exports: moduleExports}, '', '', vscode, context, BufferPolyfill);
+            // Web extensions don't need Buffer polyfill
+            const factory = new Function('exports', 'require', 'module', '__filename', '__dirname', 'vscode', 'context', code);
+            factory(moduleExports, moduleRequire, {exports: moduleExports}, '', '', vscode, context);
             return moduleExports;
         } catch (error) {
             logger.warn(`Failed to evaluate module: ${error}`);
