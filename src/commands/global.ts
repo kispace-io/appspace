@@ -9,6 +9,7 @@ import { activeEditorSignal, activePartSignal } from "../core/appstate";
 import { appSettings } from "../core/settingsservice";
 import { extensionRegistry } from "../core/extensionregistry";
 import type { Extension } from "../core/extensionregistry";
+import { marketplaceRegistry } from "../core/marketplaceregistry";
 import "./files";
 import "./version-info";
 
@@ -257,6 +258,72 @@ registerAll({
                 }
             });
             return extensions;
+        }
+    }
+})
+
+registerAll({
+    command: {
+        "id": "extensions.installFromGitHub",
+        "name": "Install Extension from GitHub",
+        "description": "Installs an extension directly from a GitHub repository. Supports formats: owner/repo, owner/repo@branch, owner/repo@tag, or full GitHub URLs.",
+        "parameters": [
+            {
+                "name": "repoUrl",
+                "description": "GitHub repository URL or short format (e.g., 'owner/repo', 'owner/repo@main', 'https://github.com/owner/repo')",
+                "required": true
+            },
+            {
+                "name": "ref",
+                "description": "Optional branch, tag, or commit hash (overrides ref in URL)",
+                "required": false
+            },
+            {
+                "name": "path",
+                "description": "Optional path to extension entry file (overrides auto-discovery)",
+                "required": false
+            },
+            {
+                "name": "extensionId",
+                "description": "Optional custom extension ID (defaults to github.owner.repo)",
+                "required": false
+            },
+            {
+                "name": "name",
+                "description": "Optional custom extension name (defaults to owner/repo)",
+                "required": false
+            }
+        ]
+    },
+    handler: {
+        execute: async (context: any) => {
+            const repoUrl = context.params?.["repoUrl"];
+            if (!repoUrl) {
+                toastError("GitHub repository URL is required");
+                return;
+            }
+
+            try {
+                const options: any = {};
+                if (context.params?.["ref"]) {
+                    options.ref = context.params["ref"];
+                }
+                if (context.params?.["path"]) {
+                    options.path = context.params["path"];
+                }
+                if (context.params?.["extensionId"]) {
+                    options.extensionId = context.params["extensionId"];
+                }
+                if (context.params?.["name"]) {
+                    options.name = context.params["name"];
+                }
+
+                await marketplaceRegistry.installExtensionFromGitHub(repoUrl, options);
+                toastInfo(`Successfully installed extension from GitHub: ${repoUrl}`);
+            } catch (error: any) {
+                toastError(`Failed to install extension from GitHub: ${error.message || error}`);
+                throw error;
+            }
         }
     }
 })

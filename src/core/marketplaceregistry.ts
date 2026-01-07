@@ -294,6 +294,64 @@ class MarketplaceRegistry {
         logger.info(`Successfully installed Open VSX extension: ${extensionId}`);
     }
 
+    async installExtensionFromGitHub(
+        repoUrl: string,
+        options?: { ref?: string; path?: string; extensionId?: string; name?: string }
+    ): Promise<void> {
+        const {GitHubUrlParser} = await import("./github-install/github-url-parser");
+        const {GitHubExtensionLoader} = await import("./github-install/github-extension-loader");
+
+        let parsed;
+        try {
+            parsed = GitHubUrlParser.parse(repoUrl);
+            if (options?.ref) {
+                parsed.ref = options.ref;
+            }
+            if (options?.path) {
+                parsed.path = options.path;
+            }
+        } catch (error) {
+            throw new Error(`Invalid GitHub URL: ${error}`);
+        }
+
+        const extensionId = options?.extensionId || `github.${parsed.owner}.${parsed.repo}`;
+        
+        if (extensionRegistry.isEnabled(extensionId)) {
+            logger.info(`Extension ${extensionId} is already installed`);
+            return;
+        }
+
+        logger.info(`Installing extension from GitHub: ${parsed.owner}/${parsed.repo}@${parsed.ref || 'main'}`);
+
+        try {
+            const cdnUrl = await GitHubExtensionLoader.resolveExtensionUrl(
+                GitHubUrlParser.toGitHubUrl(parsed)
+            );
+
+            const extension: Extension = {
+                id: extensionId,
+                name: options?.name || `${parsed.owner}/${parsed.repo}`,
+                description: `Extension from GitHub: ${parsed.owner}/${parsed.repo}`,
+                url: cdnUrl,
+                external: true,
+                github: {
+                    owner: parsed.owner,
+                    repo: parsed.repo,
+                    ref: parsed.ref,
+                    path: parsed.path,
+                },
+            };
+
+            extensionRegistry.registerExtension(extension);
+            await extensionRegistry.enable(extensionId);
+            
+            logger.info(`Successfully installed GitHub extension: ${extensionId}`);
+        } catch (error) {
+            logger.error(`Failed to install GitHub extension: ${error}`);
+            throw new Error(`Failed to install extension from GitHub: ${error}`);
+        }
+    }
+
     isMarketplaceExtension(extensionId: string): boolean {
         const extension = extensionRegistry.getExtensions().find(e => e.id === extensionId);
         return extension !== undefined && extension.external === true;

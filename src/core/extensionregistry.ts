@@ -58,6 +58,17 @@ export interface Extension {
     external?: boolean;
     
     /**
+     * Optional GitHub repository information for extensions loaded from GitHub.
+     * This allows storing the source repository separately from the resolved CDN URL.
+     */
+    github?: {
+        owner: string;
+        repo: string;
+        ref?: string;
+        path?: string;
+    };
+    
+    /**
      * Optional list of extension IDs that must be loaded before this extension.
      * Dependencies are loaded recursively and automatically when this extension is loaded.
      * The system includes circular dependency detection.
@@ -241,7 +252,20 @@ class ExtensionRegistry {
                     if (extension.loader) {
                         return extension.loader()
                     } else if (extension.url) {
-                        if (extension.url?.endsWith('.vsix')) {
+                        let urlToLoad = extension.url;
+                        
+                        const {GitHubExtensionLoader} = await import("./github-install/github-extension-loader");
+                        if (GitHubExtensionLoader.isGitHubUrl(urlToLoad)) {
+                            try {
+                                urlToLoad = await GitHubExtensionLoader.resolveExtensionUrl(urlToLoad);
+                                logger.debug(`Resolved GitHub URL to CDN: ${extension.url} -> ${urlToLoad}`);
+                            } catch (error) {
+                                logger.error(`Failed to resolve GitHub URL ${extension.url}: ${error}`);
+                                throw new Error(`Failed to resolve GitHub extension URL: ${error}`);
+                            }
+                        }
+                        
+                        if (urlToLoad?.endsWith('.vsix')) {
                             const {vsixExtensionLoader} = await import("./open-vsx/vsix-extension-loader");
                             const {openVSXClient} = await import("./open-vsx/openvsx-client");
                             
@@ -253,14 +277,14 @@ class ExtensionRegistry {
                                     await vsixExtensionLoader.loadFromOpenVSX(openVSXExtension);
                                 } catch (error) {
                                     logger.warn(`Could not fetch Open VSX metadata for ${extensionId}, loading from URL: ${error}`);
-                                    await vsixExtensionLoader.loadFromUrl(extension.url);
+                                    await vsixExtensionLoader.loadFromUrl(urlToLoad);
                                 }
                             } else {
-                                await vsixExtensionLoader.loadFromUrl(extension.url);
+                                await vsixExtensionLoader.loadFromUrl(urlToLoad);
                             }
                             return { default: () => {} };
                         }
-                        return import(extension.url)
+                        return import(/* @vite-ignore */ urlToLoad)
                     }
                 })
 
